@@ -47,6 +47,7 @@ CREATE TABLE IF NOT EXISTS schedule (
   send_at TIMESTAMPTZ NOT NULL,
   status TEXT DEFAULT 'pending' CHECK (status IN ('pending', 'sent', 'failed')),
   error TEXT,
+  retry_count INTEGER DEFAULT 0,
   sent_at TIMESTAMPTZ,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );

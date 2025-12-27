@@ -225,6 +225,7 @@ async function addScheduleItems(items) {
         media_type: item.mediaType || null,
         send_at: item.sendAt,
         status: 'pending',
+        retry_count: 0,
     }));
     const { data, error } = await supabase
         .from('schedule')
@@ -254,6 +255,49 @@ async function updateScheduleStatus(id, status, error = null, sentAt = null) {
     return true;
 }
 
+async function incrementRetryCount(id, maxRetries = 3) {
+    if (!supabase) return { shouldRetry: false };
+
+    // First get current retry count
+    const { data: item, error: fetchError } = await supabase
+        .from('schedule')
+        .select('retry_count')
+        .eq('id', id)
+        .single();
+
+    if (fetchError) {
+        console.error('Failed to fetch schedule item:', fetchError.message);
+        return { shouldRetry: false };
+    }
+
+    const currentRetryCount = item?.retry_count || 0;
+    const newRetryCount = currentRetryCount + 1;
+
+    if (newRetryCount >= maxRetries) {
+        // Max retries reached, mark as failed
+        return { shouldRetry: false, retryCount: newRetryCount };
+    }
+
+    // Increment retry count and reschedule for 5 minutes later
+    const newSendAt = new Date(Date.now() + 5 * 60 * 1000).toISOString();
+
+    const { error: updateError } = await supabase
+        .from('schedule')
+        .update({
+            retry_count: newRetryCount,
+            send_at: newSendAt,
+            error: null // Clear previous error for retry
+        })
+        .eq('id', id);
+
+    if (updateError) {
+        console.error('Failed to increment retry count:', updateError.message);
+        return { shouldRetry: false };
+    }
+
+    return { shouldRetry: true, retryCount: newRetryCount, nextRetryAt: newSendAt };
+}
+
 async function clearFinishedSchedule() {
     if (!supabase) return 0;
     const { data, error } = await supabase
@@ -275,7 +319,8 @@ async function getDueScheduleItems() {
         .from('schedule')
         .select('*')
         .eq('status', 'pending')
-        .lte('send_at', now);
+        .lte('send_at', now)
+        .order('send_at', { ascending: true });
     if (error) {
         console.error('Failed to get due schedule items:', error.message);
         return [];
@@ -345,6 +390,7 @@ export {
     getPendingSchedule,
     addScheduleItems,
     updateScheduleStatus,
+    incrementRetryCount,
     clearFinishedSchedule,
     getDueScheduleItems,
     // Finances

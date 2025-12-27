@@ -779,21 +779,47 @@ async function checkBirthdays(io) {
 }
 
 async function processQueue(io) {
-	if (!sock || !connectionStatus.connected) return;
-	if (sendingInProgress) return;
-	if (!db.isSupabaseConfigured) return;
+	if (!sock || !connectionStatus.connected) {
+		logger.debug("Queue processing skipped: WhatsApp not connected");
+		return;
+	}
+	if (sendingInProgress) {
+		logger.debug("Queue processing skipped: Already in progress");
+		return;
+	}
+	if (!db.isSupabaseConfigured) {
+		logger.debug("Queue processing skipped: Database not configured");
+		return;
+	}
 
 	sendingInProgress = true;
+	let processedCount = 0;
+	let successCount = 0;
+	let failedCount = 0;
+
 	try {
 		const dueItems = await db.getDueScheduleItems();
 
+		if (dueItems.length === 0) {
+			return;
+		}
+
+		logger.info(`Processing ${dueItems.length} scheduled message(s)`);
+
 		for (const item of dueItems) {
+			processedCount++;
+
 			try {
+				// Validate WhatsApp connection before each send
+				if (!sock || !connectionStatus.connected) {
+					logger.warn("Lost connection during queue processing, stopping");
+					break;
+				}
+
 				let jid;
 
 				// Check if recipient is a group JID (ends with @g.us)
 				if (item.recipient.includes('@g.us')) {
-					// It's a group JID - use it directly
 					jid = item.recipient;
 				} else {
 					// It's a phone number - convert to individual JID
@@ -804,12 +830,16 @@ async function processQueue(io) {
 					if (phone.length < 10) {
 						await db.updateScheduleStatus(item.id, "failed", "Invalid phone number: too short");
 						logger.warn({ item }, "Phone number too short");
+						failedCount++;
+						io.emit("queue:item", { id: item.id, status: 'failed', error: 'Invalid phone number' });
 						continue;
 					}
 					jid = jidNormalizedUser(phone + "@s.whatsapp.net");
 				}
+
 				const hasMedia = Boolean(item.media_url);
 				let localOrHttp = null;
+
 				if (hasMedia) {
 					if (/^https?:\/\//i.test(item.media_url)) {
 						localOrHttp = item.media_url;
@@ -841,10 +871,9 @@ async function processQueue(io) {
 							content = buf;
 						} catch (fileError) {
 							logger.error("File not found:", localOrHttp, fileError.message);
-							if (item.caption) {
-								await sock.sendMessage(jid, { text: item.caption });
-							}
 							await db.updateScheduleStatus(item.id, "failed", "Media file not found");
+							failedCount++;
+							io.emit("queue:item", { id: item.id, status: 'failed', error: 'Media file not found' });
 							continue;
 						}
 					}
@@ -867,11 +896,21 @@ async function processQueue(io) {
 					}
 				} else if (item.caption) {
 					await sock.sendMessage(jid, { text: item.caption });
+				} else {
+					// No content to send
+					await db.updateScheduleStatus(item.id, "failed", "No message content");
+					failedCount++;
+					io.emit("queue:item", { id: item.id, status: 'failed', error: 'No message content' });
+					continue;
 				}
 
+				// Message sent successfully
 				await db.updateScheduleStatus(item.id, "sent", null, new Date().toISOString());
+				successCount++;
 				io.emit("queue:item", { id: item.id, status: 'sent' });
+				logger.info(`Message sent to ${item.recipient} (${processedCount}/${dueItems.length})`);
 
+				// Clean up local media file after successful send
 				if (hasMedia && localOrHttp && !(/^https?:/i.test(localOrHttp))) {
 					try {
 						await fsp.unlink(localOrHttp);
@@ -880,19 +919,74 @@ async function processQueue(io) {
 						logger.warn("Failed to delete media file:", localOrHttp, deleteError.message);
 					}
 				}
+
+				// Small delay between messages to avoid rate limiting
+				if (processedCount < dueItems.length) {
+					await new Promise(r => setTimeout(r, 1000));
+				}
+
 			} catch (e) {
-				await db.updateScheduleStatus(item.id, "failed", e?.message || String(e));
-				logger.error({ err: e, item }, "send failed");
-				io.emit("queue:item", { id: item.id, status: 'failed', error: e?.message || String(e) });
+				const errorMessage = e?.message || String(e);
+				logger.error({ err: e, item }, "Send failed");
+
+				// Check if error is retryable
+				const isRetryable = isRetryableError(errorMessage);
+
+				if (isRetryable) {
+					const retryResult = await db.incrementRetryCount(item.id, 3);
+
+					if (retryResult.shouldRetry) {
+						logger.info(`Message to ${item.recipient} will retry (attempt ${retryResult.retryCount}/3) at ${retryResult.nextRetryAt}`);
+						io.emit("queue:item", {
+							id: item.id,
+							status: 'pending',
+							error: `Retry ${retryResult.retryCount}/3: ${errorMessage}`,
+							nextRetryAt: retryResult.nextRetryAt
+						});
+					} else {
+						await db.updateScheduleStatus(item.id, "failed", `Max retries exceeded: ${errorMessage}`);
+						failedCount++;
+						io.emit("queue:item", { id: item.id, status: 'failed', error: `Max retries exceeded: ${errorMessage}` });
+					}
+				} else {
+					// Non-retryable error
+					await db.updateScheduleStatus(item.id, "failed", errorMessage);
+					failedCount++;
+					io.emit("queue:item", { id: item.id, status: 'failed', error: errorMessage });
+				}
 			}
 		}
+
+		logger.info(`Queue processing complete: ${successCount} sent, ${failedCount} failed out of ${processedCount} processed`);
 
 		const allPending = await db.getPendingSchedule();
 		io.emit("queue:update", { size: allPending.length });
 
+	} catch (e) {
+		logger.error({ err: e }, "Queue processing error");
 	} finally {
 		sendingInProgress = false;
 	}
+}
+
+// Helper to determine if an error is retryable
+function isRetryableError(errorMessage) {
+	const retryablePatterns = [
+		/timeout/i,
+		/network/i,
+		/connection/i,
+		/ETIMEDOUT/i,
+		/ECONNRESET/i,
+		/ENOTFOUND/i,
+		/socket hang up/i,
+		/rate limit/i,
+		/too many requests/i,
+		/503/,
+		/502/,
+		/500/,
+	];
+
+	return retryablePatterns.some(pattern => pattern.test(errorMessage));
 }
 async function cleanupOldMediaFiles() {
 	try {
