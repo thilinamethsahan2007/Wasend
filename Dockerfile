@@ -7,12 +7,18 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install dependencies
-RUN npm ci --only=production
+RUN npm ci --omit=dev
 
 # Production stage
 FROM node:20-alpine
 
 WORKDIR /app
+
+# Set timezone to Asia/Colombo (Sri Lanka)
+ENV TZ=Asia/Colombo
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Colombo /etc/localtime && \
+    echo "Asia/Colombo" > /etc/timezone
 
 # Create non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
