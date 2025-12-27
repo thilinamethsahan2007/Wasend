@@ -1,0 +1,1729 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="WaSender - A powerful WhatsApp automation bot with AI-powered features">
+    <title>WaSender 2.0 | WhatsApp Personal Bot</title>
+    <link rel="icon"
+        href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🤖</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script src="/socket.io/socket.io.js"></script>
+</head>
+
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header fade-in">
+            <a href="/" class="logo">
+                <div class="logo-icon">🤖</div>
+                <span class="logo-text">WaSender</span>
+                <span class="logo-version">v2.0</span>
+            </a>
+            <div style="display: flex; align-items: center; gap: 16px;">
+                <div id="connectionStatus" class="status-badge status-disconnected">
+                    <span class="status-dot"></span>
+                    <span>Disconnected</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="nav-tabs slide-up">
+            <button class="nav-tab active" data-tab="dashboard">
+                <i class="bi bi-speedometer2"></i> Dashboard
+            </button>
+            <button class="nav-tab" data-tab="groups">
+                <i class="bi bi-people-fill"></i> Groups
+            </button>
+        </nav>
+
+        <!-- Dashboard Tab -->
+        <div id="dashboard" class="tab-content active">
+            <!-- Stats Overview -->
+            <div class="stats-grid slide-up">
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #00d9ff, #0099cc);">
+                        <i class="bi bi-people-fill"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="statContacts">0</span>
+                        <span class="stat-label">Contacts</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+                        <i class="bi bi-envelope-paper-fill"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="statQueue">0</span>
+                        <span class="stat-label">In Queue</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #ff006e, #cc0058);">
+                        <i class="bi bi-cake2-fill"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="statBirthdays">0</span>
+                        <span class="stat-label">Birthdays</span>
+                    </div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: linear-gradient(135deg, #00ff88, #00cc6a);">
+                        <i class="bi bi-clock-history"></i>
+                    </div>
+                    <div class="stat-content">
+                        <span class="stat-value" id="statUptime">--</span>
+                        <span class="stat-label">Uptime</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="grid grid-4">
+                <!-- Bot Control Card -->
+                <div class="card slide-up">
+                    <div class="card-header">
+                        <div class="card-icon"><i class="bi bi-power"></i></div>
+                        <h3 class="card-title">Bot Control</h3>
+                    </div>
+
+                    <!-- QR Code Container -->
+                    <div id="qrCode" class="qr-container">
+                        <div class="qr-placeholder">
+                            <i class="bi bi-qr-code"></i>
+                            <p>Click Connect to scan QR code</p>
+                        </div>
+                    </div>
+
+                    <!-- Control Buttons -->
+                    <div class="btn-group vertical" style="margin-top: 20px;">
+                        <button class="btn btn-success btn-block" id="connectBtn">
+                            <i class="bi bi-play-fill"></i> Connect
+                        </button>
+                        <button class="btn btn-danger btn-block" id="disconnectBtn" disabled>
+                            <i class="bi bi-stop-fill"></i> Disconnect
+                        </button>
+                    </div>
+
+                    <!-- Settings -->
+                    <div class="settings-panel">
+                        <label class="form-switch">
+                            <input type="checkbox" id="autoViewStatus" class="switch-input">
+                            <span class="switch-slider"></span>
+                            <span class="switch-label">Auto-view Status</span>
+                        </label>
+
+                        <label class="form-switch">
+                            <input type="checkbox" id="autoReactStatus" class="switch-input">
+                            <span class="switch-slider"></span>
+                            <span class="switch-label">Auto-react to Status</span>
+                        </label>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label class="form-label">Reaction Emojis</label>
+                            <input type="text" id="reactionEmoji" class="form-control" placeholder="e.g., 🔥,👍,😂">
+                        </div>
+
+                        <button class="btn btn-primary btn-sm" id="saveSettingsBtn">
+                            <i class="bi bi-check2"></i> Save Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column -->
+                <div style="display: flex; flex-direction: column; gap: 24px;">
+                    <!-- Send Message Card -->
+                    <div class="card slide-up">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="bi bi-send"></i></div>
+                            <h3 class="card-title">Send Message</h3>
+                        </div>
+
+                        <div class="form-group">
+                            <label class="form-label">Recipients</label>
+                            <div class="input-group">
+                                <textarea id="recipients" class="form-control"
+                                    placeholder="Enter phone numbers, comma-separated" rows="2"></textarea>
+                                <button class="btn btn-outline" id="browseContactsBtn" title="Browse Contacts">
+                                    <i class="bi bi-people"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Message</label>
+                                <textarea id="caption" class="form-control" placeholder="Type your message..."
+                                    rows="3"></textarea>
+                                <div id="smartReplies"
+                                    style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px;"></div>
+                            </div>
+                            <div class="form-group">
+                                <label class="form-label">Media (Optional)</label>
+                                <input type="file" id="mediaFile" class="form-control">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-2">
+                            <div class="form-group">
+                                <label class="form-label">Schedule (Optional)</label>
+                                <input type="datetime-local" id="sendAt" class="form-control">
+                            </div>
+                            <div class="form-group" style="display: flex; align-items: flex-end;">
+                                <button class="btn btn-primary btn-block" id="scheduleBtn">
+                                    <i class="bi bi-clock-history"></i> Send / Schedule
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Two Column Grid -->
+                    <div class="grid grid-2">
+                        <!-- Contacts Card -->
+                        <div class="card slide-up">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="bi bi-person-lines-fill"></i></div>
+                                <h3 class="card-title">Contacts</h3>
+                            </div>
+
+                            <div class="input-group" style="margin-bottom: 16px;">
+                                <input type="file" id="vcfImportFile" class="form-control" accept=".vcf">
+                                <button class="btn btn-outline" id="importVcfBtn">Import VCF</button>
+                                <button class="btn btn-primary" id="addContactBtn" title="Add Contact">
+                                    <i class="bi bi-plus-lg"></i>
+                                </button>
+                            </div>
+
+                            <div class="input-group" style="margin-bottom: 12px;">
+                                <input type="text" id="contactSearch" class="form-control"
+                                    placeholder="Search contacts...">
+                                <span
+                                    style="padding: 0 12px; display: flex; align-items: center; color: var(--text-muted);">
+                                    <i class="bi bi-search"></i>
+                                </span>
+                            </div>
+
+                            <div id="contactList" class="list-group">
+                                <div class="empty-state">
+                                    <i class="bi bi-people empty-state-icon"></i>
+                                    <p class="empty-state-text">No contacts yet</p>
+                                </div>
+                            </div>
+
+                            <a href="/api/contacts/export-csv" class="btn btn-outline btn-sm btn-block"
+                                style="margin-top: 16px;" download="contacts.csv">
+                                <i class="bi bi-download"></i> Export CSV
+                            </a>
+                        </div>
+
+                        <!-- Birthday Card -->
+                        <div class="card slide-up">
+                            <div class="card-header">
+                                <div class="card-icon"><i class="bi bi-cake2"></i></div>
+                                <h3 class="card-title">Birthday Reminders</h3>
+                            </div>
+
+                            <div class="grid grid-2" style="gap: 12px;">
+                                <input type="text" id="birthdayName" class="form-control" placeholder="Name">
+                                <div class="input-group">
+                                    <input type="text" id="birthdayPhone" class="form-control" placeholder="Phone">
+                                    <button class="btn btn-outline btn-sm" id="browseBirthdayContactBtn">
+                                        <i class="bi bi-people"></i>
+                                    </button>
+                                </div>
+                                <input type="date" id="birthdayDate" class="form-control">
+                                <select id="birthdayGender" class="form-control form-select">
+                                    <option selected disabled>Gender...</option>
+                                    <option value="male">Male</option>
+                                    <option value="female">Female</option>
+                                </select>
+                            </div>
+
+                            <select id="birthdayRelationship" class="form-control form-select"
+                                style="margin-top: 12px;">
+                                <option selected disabled>Relationship...</option>
+                                <option value="friend">Friend</option>
+                                <option value="family">Family</option>
+                                <option value="relative">Relative</option>
+                                <option value="other">Other</option>
+                            </select>
+
+                            <input type="text" id="birthdayCustomMessage" class="form-control"
+                                placeholder="Custom Message (Optional)" style="margin-top: 12px;">
+
+                            <div class="btn-group" style="margin-top: 16px;">
+                                <button class="btn btn-outline btn-sm" id="previewBirthdayMsgBtn">
+                                    <i class="bi bi-eye"></i> Preview AI
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="addBirthdayBtn">
+                                    <i class="bi bi-plus"></i> Add Birthday
+                                </button>
+                            </div>
+
+                            <div class="divider"></div>
+
+                            <div id="birthdayList" class="list-group">
+                                <div class="empty-state">
+                                    <i class="bi bi-cake2 empty-state-icon"></i>
+                                    <p class="empty-state-text">No birthdays added</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Message Queue Card -->
+                    <div class="card slide-up">
+                        <div class="card-header">
+                            <div class="card-icon"><i class="bi bi-card-list"></i></div>
+                            <h3 class="card-title">Message Queue</h3>
+                        </div>
+
+                        <div id="queueList" class="list-group">
+                            <div class="empty-state">
+                                <i class="bi bi-inbox empty-state-icon"></i>
+                                <p class="empty-state-text">Queue is empty</p>
+                            </div>
+                        </div>
+
+                        <button class="btn btn-outline btn-sm" id="clearQueueBtn" style="margin-top: 16px;">
+                            <i class="bi bi-trash"></i> Clear Finished
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Groups Tab -->
+        <div id="groups" class="tab-content">
+            <div class="grid grid-2">
+                <!-- Groups List Card -->
+                <div class="card slide-up">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                        <h3 class="card-title">WhatsApp Groups</h3>
+                    </div>
+
+                    <div class="input-group" style="margin-bottom: 16px;">
+                        <input type="text" id="groupSearch" class="form-control" placeholder="Search groups...">
+                        <button class="btn btn-primary" id="refreshGroupsBtn" title="Refresh Groups">
+                            <i class="bi bi-arrow-clockwise"></i>
+                        </button>
+                    </div>
+
+                    <div id="groupsList" class="list-group" style="max-height: 500px; overflow-y: auto;">
+                        <div class="empty-state">
+                            <i class="bi bi-people empty-state-icon"></i>
+                            <p class="empty-state-text">Click refresh to load groups</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Group Actions Card -->
+                <div class="card slide-up">
+                    <div class="card-header">
+                        <div class="card-icon" style="background: linear-gradient(135deg, #00ff88, #00cc6a);">
+                            <i class="bi bi-chat-square-text"></i>
+                        </div>
+                        <h3 class="card-title">Send to Group</h3>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Selected Group</label>
+                        <input type="text" id="selectedGroupName" class="form-control"
+                            placeholder="Select a group from the list" readonly>
+                        <input type="hidden" id="selectedGroupId">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Message</label>
+                        <textarea id="groupMessage" class="form-control" placeholder="Type your message..."
+                            rows="4"></textarea>
+                    </div>
+
+                    <div class="form-group">
+                        <label class="form-label">Media (Optional)</label>
+                        <input type="file" id="groupMediaFile" class="form-control">
+                    </div>
+
+                    <div class="grid grid-2">
+                        <div class="form-group">
+                            <label class="form-label">Schedule (Optional)</label>
+                            <input type="datetime-local" id="groupSendAt" class="form-control">
+                        </div>
+                        <div class="form-group" style="display: flex; align-items: flex-end;">
+                            <button class="btn btn-success btn-block" id="sendToGroupBtn">
+                                <i class="bi bi-send"></i> Send to Group
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="divider"></div>
+
+                    <!-- Group Info -->
+                    <div id="groupInfo" style="display: none;">
+                        <h4 style="margin-bottom: 12px; font-size: 1rem;">Group Info</h4>
+                        <div class="group-info-grid">
+                            <div class="group-info-item">
+                                <i class="bi bi-people"></i>
+                                <span id="groupMemberCount">0 members</span>
+                            </div>
+                            <div class="group-info-item">
+                                <i class="bi bi-person-badge"></i>
+                                <span id="groupCreator">--</span>
+                            </div>
+                            <div class="group-info-item">
+                                <i class="bi bi-calendar"></i>
+                                <span id="groupCreatedAt">--</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Group Members Management -->
+                    <div id="groupMembersSection" style="display: none; margin-top: 20px;">
+                        <div
+                            style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                            <h4 style="font-size: 1rem; margin: 0;">Group Members</h4>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-outline btn-sm" id="importVcfMembersBtn" title="Import from VCF">
+                                    <i class="bi bi-file-earmark-person"></i> VCF
+                                </button>
+                                <button class="btn btn-outline btn-sm" id="bulkAddMembersBtn" title="Add phone numbers">
+                                    <i class="bi bi-phone"></i> Bulk Add
+                                </button>
+                                <button class="btn btn-primary btn-sm" id="addMemberBtn">
+                                    <i class="bi bi-person-plus"></i> Add
+                                </button>
+                            </div>
+                        </div>
+                        <div id="groupMembersList" class="list-group" style="max-height: 200px; overflow-y: auto;">
+                            <div class="empty-state" style="padding: 16px;">
+                                <p class="empty-state-text">Select a group to view members</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Create Group Card -->
+            <div class="card slide-up" style="margin-top: 24px;">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #ff006e, #cc0058);">
+                        <i class="bi bi-plus-circle"></i>
+                    </div>
+                    <h3 class="card-title">Create New Group</h3>
+                </div>
+
+                <div class="grid grid-2">
+                    <div class="form-group">
+                        <label class="form-label">Group Name</label>
+                        <input type="text" id="newGroupName" class="form-control" placeholder="Enter group name...">
+                    </div>
+                    <div class="form-group" style="display: flex; align-items: flex-end;">
+                        <button class="btn btn-primary btn-block" id="createGroupBtn">
+                            <i class="bi bi-plus-lg"></i> Create Group
+                        </button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Add Members (Select from contacts)</label>
+                    <div class="input-group">
+                        <input type="text" id="newGroupMembersSearch" class="form-control"
+                            placeholder="Search contacts to add...">
+                    </div>
+                </div>
+
+                <div id="newGroupMembersList" class="checkbox-list"
+                    style="max-height: 200px; overflow-y: auto; margin-bottom: 12px;">
+                    <div class="empty-state" style="padding: 16px;">
+                        <p class="empty-state-text">Type to search contacts</p>
+                    </div>
+                </div>
+
+                <div id="selectedNewGroupMembers" style="display: flex; flex-wrap: wrap; gap: 8px;">
+                    <!-- Selected members will appear here as badges -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Member Modal -->
+    <div class="modal-overlay" id="addMemberModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h4 class="modal-title">Add Member to Group</h4>
+                <button class="modal-close" onclick="closeAddMemberModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="addMemberSearchInput" class="form-control" placeholder="Search contacts..."
+                    style="margin-bottom: 16px;">
+                <div id="addMemberContactList" class="checkbox-list" style="max-height: 300px; overflow-y: auto;"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeAddMemberModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirmAddMemberBtn">Add Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- VCF Import Modal -->
+    <div class="modal-overlay" id="vcfImportModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h4 class="modal-title">Import Members from VCF</h4>
+                <button class="modal-close" onclick="closeVcfImportModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Select VCF File</label>
+                    <input type="file" id="vcfMemberFile" class="form-control" accept=".vcf">
+                </div>
+                <div id="vcfMemberPreview" style="display: none; margin-top: 16px;">
+                    <p style="margin-bottom: 8px; font-size: 0.9rem; opacity: 0.7;">Found <span
+                            id="vcfMemberCount">0</span> phone numbers:</p>
+                    <div id="vcfMemberList" class="list-group" style="max-height: 200px; overflow-y: auto;"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeVcfImportModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirmVcfImportBtn" disabled>Import Members</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bulk Add Phone Numbers Modal -->
+    <div class="modal-overlay" id="bulkAddModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h4 class="modal-title">Bulk Add Phone Numbers</h4>
+                <button class="modal-close" onclick="closeBulkAddModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label class="form-label">Enter Phone Numbers (one per line)</label>
+                    <textarea id="bulkPhoneNumbers" class="form-control" rows="8"
+                        placeholder="94771234567&#10;94772345678&#10;+1234567890"></textarea>
+                </div>
+                <p style="font-size: 0.85rem; opacity: 0.7; margin-top: 8px;">
+                    <i class="bi bi-info-circle"></i> Include country code. One number per line.
+                </p>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeBulkAddModal()">Cancel</button>
+                <button class="btn btn-primary" id="confirmBulkAddBtn">Add Members</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Contacts Modal -->
+    <div class="modal-overlay" id="contactsModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h4 class="modal-title">Select Contacts</h4>
+                <button class="modal-close" onclick="closeContactsModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="contactSearchInput" class="form-control" placeholder="Search contacts..."
+                    style="margin-bottom: 16px;">
+                <div id="modalContactList" class="checkbox-list"></div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-outline" onclick="closeContactsModal()">Cancel</button>
+                <button class="btn btn-primary" id="addSelectedContactsBtn">Add Selected</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ============================================
+        // WaSender 2.0 - Client JavaScript
+        // ============================================
+
+        const socket = io();
+        let contactModalTarget = null;
+
+        // ============================================
+        // Tab Navigation
+        // ============================================
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Show corresponding content
+                const tabId = tab.dataset.tab;
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.classList.remove('active');
+                });
+                document.getElementById(tabId).classList.add('active');
+
+                // Load finance data when growth tab is shown
+                if (tabId === 'growth') {
+                    loadFinanceAnalysis();
+                }
+            });
+        });
+
+        // ============================================
+        // Toast Notifications
+        // ============================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toastContainer');
+            const toast = document.createElement('div');
+            toast.className = `toast toast-${type}`;
+            toast.innerHTML = `
+                <span class="toast-message">${message}</span>
+                <button class="toast-close" onclick="this.parentElement.remove()">&times;</button>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                if (toast.parentElement) {
+                    toast.remove();
+                }
+            }, 5000);
+        }
+
+        // ============================================
+        // Socket Event Handlers
+        // ============================================
+        socket.on('connection:init', (data) => {
+            updateConnectionStatus(data.status.connected, data.isConnecting);
+        });
+
+        socket.on('connection:update', (data) => {
+            updateConnectionStatus(data.connected, data.isConnecting);
+            if (data.reason) showToast(`Disconnected: ${data.reason}`, 'warning');
+        });
+
+        socket.on('qr', (data) => {
+            document.getElementById('qrCode').innerHTML = `<img src="${data.qr}" alt="QR Code">`;
+        });
+
+        socket.on('queue:update', () => {
+            loadQueue();
+        });
+
+        socket.on('queue:scheduled', (newItems) => {
+            loadQueue();
+            showToast(`${newItems.length} message(s) scheduled`, 'success');
+        });
+
+        socket.on('ai:reply-suggestions', (data) => {
+            const container = document.getElementById('smartReplies');
+            container.innerHTML = '';
+            if (data.suggestions && data.suggestions.length > 0) {
+                data.suggestions.forEach(suggestion => {
+                    const btn = document.createElement('button');
+                    btn.className = 'btn btn-outline btn-sm';
+                    btn.textContent = suggestion;
+                    btn.onclick = () => {
+                        const caption = document.getElementById('caption');
+                        caption.value += (caption.value ? ' ' : '') + suggestion;
+                    };
+                    container.appendChild(btn);
+                });
+            }
+        });
+
+        // ============================================
+        // Connection Status
+        // ============================================
+        function updateConnectionStatus(connected, connecting) {
+            const statusEl = document.getElementById('connectionStatus');
+            const connectBtn = document.getElementById('connectBtn');
+            const disconnectBtn = document.getElementById('disconnectBtn');
+            const qrCodeEl = document.getElementById('qrCode');
+
+            connectBtn.disabled = connected || connecting;
+            disconnectBtn.disabled = !connected;
+
+            if (connected) {
+                statusEl.className = 'status-badge status-connected';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Connected</span>';
+                qrCodeEl.innerHTML = `
+                    <div class="qr-placeholder">
+                        <i class="bi bi-check-circle" style="color: var(--neon-green);"></i>
+                        <p>WhatsApp Connected</p>
+                    </div>
+                `;
+            } else if (connecting) {
+                statusEl.className = 'status-badge status-connecting';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Connecting...</span>';
+            } else {
+                statusEl.className = 'status-badge status-disconnected';
+                statusEl.innerHTML = '<span class="status-dot"></span><span>Disconnected</span>';
+                qrCodeEl.innerHTML = `
+                    <div class="qr-placeholder">
+                        <i class="bi bi-qr-code"></i>
+                        <p>Click Connect to scan QR code</p>
+                    </div>
+                `;
+            }
+        }
+
+        // ============================================
+        // Bot Controls
+        // ============================================
+        document.getElementById('connectBtn').addEventListener('click', () => {
+            fetch('/api/bot/connect', { method: 'POST' });
+            showToast('Connecting...', 'info');
+        });
+
+        document.getElementById('disconnectBtn').addEventListener('click', () => {
+            fetch('/api/bot/disconnect', { method: 'POST' });
+            showToast('Disconnecting...', 'info');
+        });
+
+        // ============================================
+        // Settings
+        // ============================================
+        async function loadSettings() {
+            const response = await fetch('/api/settings');
+            const settings = await response.json();
+            document.getElementById('autoViewStatus').checked = settings.autoViewStatus;
+            document.getElementById('autoReactStatus').checked = settings.autoReactStatus;
+            document.getElementById('reactionEmoji').value = settings.reactionEmoji;
+        }
+
+        document.getElementById('saveSettingsBtn').addEventListener('click', async () => {
+            const settings = {
+                autoViewStatus: document.getElementById('autoViewStatus').checked,
+                autoReactStatus: document.getElementById('autoReactStatus').checked,
+                reactionEmoji: document.getElementById('reactionEmoji').value,
+            };
+            const response = await fetch('/api/settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(settings)
+            });
+            const result = await response.json();
+            if (result.success) {
+                showToast('Settings saved!', 'success');
+            } else {
+                showToast('Failed to save settings.', 'error');
+            }
+        });
+
+        // ============================================
+        // Message Scheduling
+        // ============================================
+        document.getElementById('scheduleBtn').addEventListener('click', async () => {
+            const formData = new FormData();
+            formData.append('recipients', document.getElementById('recipients').value);
+            formData.append('caption', document.getElementById('caption').value);
+            formData.append('sendAt', document.getElementById('sendAt').value);
+            if (document.getElementById('mediaFile').files[0]) {
+                formData.append('media', document.getElementById('mediaFile').files[0]);
+            }
+
+            const response = await fetch('/api/schedule', { method: 'POST', body: formData });
+            const result = await response.json();
+            if (result.success) {
+                showToast(result.message, 'success');
+                document.getElementById('recipients').value = '';
+                document.getElementById('caption').value = '';
+                document.getElementById('mediaFile').value = '';
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+        });
+
+        // ============================================
+        // VCF Import
+        // ============================================
+        document.getElementById('importVcfBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('vcfImportFile');
+            if (!fileInput.files[0]) {
+                return showToast('Please select a VCF file.', 'warning');
+            }
+            const formData = new FormData();
+            formData.append('vcf', fileInput.files[0]);
+
+            const btn = document.getElementById('importVcfBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Importing...';
+
+            const response = await fetch('/api/contacts/import-vcf', { method: 'POST', body: formData });
+            const result = await response.json();
+
+            if (response.ok) {
+                showToast(result.message, 'success');
+                loadContacts();
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+            btn.disabled = false;
+            btn.innerHTML = 'Import VCF';
+        });
+
+        // ============================================
+        // Add Contact Manually
+        // ============================================
+        document.getElementById('addContactBtn').addEventListener('click', async () => {
+            const name = prompt('Enter contact name:');
+            if (!name) return;
+            const phone = prompt('Enter phone number:');
+            if (!phone) return;
+
+            const response = await fetch('/api/contacts', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone })
+            });
+            const result = await response.json();
+            if (result.success) {
+                showToast('Contact added.', 'success');
+                loadContacts();
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+        });
+
+        // ============================================
+        // Birthday Management
+        // ============================================
+        document.getElementById('addBirthdayBtn').addEventListener('click', async () => {
+            const name = document.getElementById('birthdayName').value;
+            const phone = document.getElementById('birthdayPhone').value;
+            const birthday = document.getElementById('birthdayDate').value;
+            const gender = document.getElementById('birthdayGender').value;
+            const relationship = document.getElementById('birthdayRelationship').value;
+            const customMessage = document.getElementById('birthdayCustomMessage').value;
+
+            if (!name || !phone || !birthday || gender === 'Gender...' || relationship === 'Relationship...') {
+                return showToast('Please fill all birthday fields.', 'warning');
+            }
+
+            const response = await fetch('/api/birthdays', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, phone, birthday, gender, relationship, customMessage })
+            });
+            const result = await response.json();
+            if (result.success) {
+                showToast('Birthday added!', 'success');
+                loadBirthdays();
+                document.getElementById('birthdayName').value = '';
+                document.getElementById('birthdayPhone').value = '';
+                document.getElementById('birthdayDate').value = '';
+                document.getElementById('birthdayGender').selectedIndex = 0;
+                document.getElementById('birthdayRelationship').selectedIndex = 0;
+                document.getElementById('birthdayCustomMessage').value = '';
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+        });
+
+        document.getElementById('previewBirthdayMsgBtn').addEventListener('click', async () => {
+            const name = document.getElementById('birthdayName').value;
+            const gender = document.getElementById('birthdayGender').value;
+            const relationship = document.getElementById('birthdayRelationship').value;
+
+            if (!name || gender === 'Gender...' || relationship === 'Relationship...') {
+                return showToast('Please provide Name, Gender, and Relationship for a preview.', 'warning');
+            }
+
+            const btn = document.getElementById('previewBirthdayMsgBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span>';
+
+            try {
+                const response = await fetch('/api/birthdays/preview-message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, gender, relationship })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    showToast(`Preview: "${result.message}"`, 'info');
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-eye"></i> Preview AI';
+            }
+        });
+
+        async function deleteBirthday(id) {
+            if (!confirm('Are you sure?')) return;
+            await fetch(`/api/birthdays/${id}`, { method: 'DELETE' });
+            showToast('Birthday deleted.', 'success');
+            loadBirthdays();
+        }
+
+        // ============================================
+        // Contacts Modal
+        // ============================================
+        function openContactsModal(target) {
+            contactModalTarget = target;
+            document.getElementById('contactsModal').classList.add('active');
+            loadModalContacts();
+        }
+
+        function closeContactsModal() {
+            document.getElementById('contactsModal').classList.remove('active');
+        }
+
+        async function loadModalContacts() {
+            const listEl = document.getElementById('modalContactList');
+            listEl.innerHTML = '<div class="spinner"></div>';
+            const response = await fetch('/api/contacts');
+            const contacts = await response.json();
+
+            if (contacts.length > 0) {
+                listEl.innerHTML = contacts.map(c => `
+                    <label class="checkbox-item">
+                        <input type="checkbox" value="${c.phone}" data-name="${c.name}">
+                        <span>${c.name} (${c.phone})</span>
+                    </label>
+                `).join('');
+            } else {
+                listEl.innerHTML = '<p style="color: var(--text-muted); text-align: center;">No contacts found.</p>';
+            }
+        }
+
+        document.getElementById('browseContactsBtn').addEventListener('click', () => openContactsModal('recipients'));
+        document.getElementById('browseBirthdayContactBtn').addEventListener('click', () => openContactsModal('birthday'));
+
+        document.getElementById('addSelectedContactsBtn').addEventListener('click', () => {
+            const selectedCheckboxes = Array.from(document.querySelectorAll('#modalContactList input[type="checkbox"]:checked'));
+
+            if (contactModalTarget === 'recipients') {
+                const selectedPhones = selectedCheckboxes.map(el => el.value);
+                const recipientsEl = document.getElementById('recipients');
+                const existing = recipientsEl.value ? recipientsEl.value.split(',').map(s => s.trim()).filter(s => s) : [];
+                const newRecipients = [...new Set([...existing, ...selectedPhones])];
+                recipientsEl.value = newRecipients.join(', ');
+            } else if (contactModalTarget === 'birthday') {
+                if (selectedCheckboxes.length > 0) {
+                    const firstSelected = selectedCheckboxes[0];
+                    document.getElementById('birthdayName').value = firstSelected.getAttribute('data-name');
+                    document.getElementById('birthdayPhone').value = firstSelected.value;
+                }
+            }
+
+            closeContactsModal();
+        });
+
+        document.getElementById('contactSearchInput').addEventListener('keyup', () => {
+            const searchTerm = document.getElementById('contactSearchInput').value.toLowerCase();
+            const contacts = document.querySelectorAll('#modalContactList .checkbox-item');
+            contacts.forEach(contact => {
+                const text = contact.textContent.toLowerCase();
+                contact.style.display = text.includes(searchTerm) ? '' : 'none';
+            });
+        });
+
+        // ============================================
+        // Data Loading Functions
+        // ============================================
+        let allContacts = [];
+
+        async function loadContacts() {
+            const response = await fetch('/api/contacts');
+            allContacts = await response.json();
+            // Sort alphabetically by name
+            allContacts.sort((a, b) => a.name.localeCompare(b.name));
+            renderContacts(allContacts);
+        }
+
+        function renderContacts(contacts) {
+            const listEl = document.getElementById('contactList');
+            if (contacts.length > 0) {
+                listEl.innerHTML = contacts.map(c => `
+                    <div class="list-item contact-item" data-id="${c.id}" data-name="${c.name.toLowerCase()}" data-phone="${c.phone}">
+                        <div class="list-item-content">
+                            <span class="list-item-title">${c.name}</span>
+                            <span class="list-item-subtitle">${c.phone}</span>
+                        </div>
+                        <div class="list-item-actions">
+                            <button class="btn btn-outline btn-sm btn-icon" onclick="editContact('${c.id}', '${c.name.replace(/'/g, "\\'")}', '${c.phone}')" title="Edit">
+                                <i class="bi bi-pencil"></i>
+                            </button>
+                            <button class="btn btn-outline btn-sm btn-icon btn-danger-hover" onclick="deleteContact('${c.id}')" title="Delete">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-people empty-state-icon"></i>
+                        <p class="empty-state-text">No contacts found</p>
+                    </div>
+                `;
+            }
+        }
+
+        // Contact search filter
+        document.getElementById('contactSearch').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderContacts(allContacts);
+                return;
+            }
+
+            const filtered = allContacts.filter(c =>
+                c.name.toLowerCase().includes(query) ||
+                c.phone.includes(query)
+            );
+            renderContacts(filtered);
+        });
+
+        function editContact(id, name, phone) {
+            const newName = prompt('Edit name:', name);
+            if (newName === null) return; // cancelled
+            const newPhone = prompt('Edit phone:', phone);
+            if (newPhone === null) return; // cancelled
+
+            fetch(`/api/contacts/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: newName, phone: newPhone })
+            }).then(res => res.json()).then(result => {
+                if (result.success) {
+                    showToast('Contact updated.', 'success');
+                    loadContacts();
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            });
+        }
+
+        async function deleteContact(id) {
+            if (!confirm('Delete this contact?')) return;
+            const res = await fetch(`/api/contacts/${id}`, { method: 'DELETE' });
+            const result = await res.json();
+            if (result.success) {
+                showToast('Contact deleted.', 'success');
+                loadContacts();
+            } else {
+                showToast(`Error: ${result.error}`, 'error');
+            }
+        }
+
+        async function loadBirthdays() {
+            const response = await fetch('/api/birthdays');
+            let birthdays = await response.json();
+            // Sort by month and day (upcoming birthdays first)
+            birthdays.sort((a, b) => {
+                const dateA = new Date(a.birthday);
+                const dateB = new Date(b.birthday);
+                const monthDiff = dateA.getMonth() - dateB.getMonth();
+                if (monthDiff !== 0) return monthDiff;
+                return dateA.getDate() - dateB.getDate();
+            });
+            const listEl = document.getElementById('birthdayList');
+            if (birthdays.length > 0) {
+                listEl.innerHTML = birthdays.map(b => {
+                    const date = new Date(b.birthday);
+                    const monthName = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                    return `
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-title">${b.name}</span>
+                            <span class="list-item-subtitle">${monthName}</span>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="deleteBirthday('${b.id}')">
+                            <i class="bi bi-trash"></i>
+                        </button>
+                    </div>
+                `}).join('');
+            } else {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-cake2 empty-state-icon"></i>
+                        <p class="empty-state-text">No birthdays added</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function loadQueue() {
+            const response = await fetch('/api/schedule');
+            const queue = await response.json();
+            const listEl = document.getElementById('queueList');
+            if (queue.length > 0) {
+                listEl.innerHTML = queue.map(item => `
+                    <div class="list-item">
+                        <div class="list-item-content">
+                            <span class="list-item-title">To: ${item.recipient}</span>
+                            <span class="list-item-subtitle">${item.caption ? item.caption.substring(0, 50) + '...' : '[Media]'}</span>
+                        </div>
+                        <span class="badge badge-${item.status}">${item.status}</span>
+                    </div>
+                `).join('');
+            } else {
+                listEl.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-inbox empty-state-icon"></i>
+                        <p class="empty-state-text">Queue is empty</p>
+                    </div>
+                `;
+            }
+        }
+
+        document.getElementById('clearQueueBtn').addEventListener('click', async () => {
+            if (!confirm('Clear sent/failed messages?')) return;
+            await fetch('/api/schedule/clear', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ mode: 'all' })
+            });
+            showToast('Queue cleared.', 'success');
+        });
+
+        // ============================================
+        // Stats Updates
+        // ============================================
+        function updateStats(data) {
+            if (data.contacts !== undefined) {
+                animateValue('statContacts', parseInt(document.getElementById('statContacts').textContent) || 0, data.contacts, 500);
+            }
+            if (data.queue !== undefined) {
+                animateValue('statQueue', parseInt(document.getElementById('statQueue').textContent) || 0, data.queue, 500);
+            }
+            if (data.birthdays !== undefined) {
+                animateValue('statBirthdays', parseInt(document.getElementById('statBirthdays').textContent) || 0, data.birthdays, 500);
+            }
+            if (data.uptime !== undefined) {
+                document.getElementById('statUptime').textContent = data.uptime;
+            }
+        }
+
+        function animateValue(elementId, start, end, duration) {
+            const element = document.getElementById(elementId);
+            if (!element) return;
+
+            const range = end - start;
+            const startTime = performance.now();
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const easeProgress = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+                const current = Math.round(start + range * easeProgress);
+                element.textContent = current;
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        async function refreshStats() {
+            try {
+                // Get contacts count
+                const contactsRes = await fetch('/api/contacts');
+                const contacts = await contactsRes.json();
+
+                // Get queue count
+                const queueRes = await fetch('/api/schedule');
+                const queue = await queueRes.json();
+                const pendingCount = queue.filter(q => q.status === 'pending').length;
+
+                // Get birthdays count
+                const birthdaysRes = await fetch('/api/birthdays');
+                const birthdays = await birthdaysRes.json();
+
+                // Get uptime
+                const uptimeRes = await fetch('/api/uptime');
+                const uptimeData = await uptimeRes.json();
+
+                updateStats({
+                    contacts: contacts.length,
+                    queue: pendingCount,
+                    birthdays: birthdays.length,
+                    uptime: uptimeData.uptime || '--'
+                });
+            } catch (e) {
+                console.error('Failed to refresh stats:', e);
+            }
+        }
+
+        // ============================================
+        // Tab Navigation
+        // ============================================
+        document.querySelectorAll('.nav-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs and content
+                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Add active class to clicked tab and corresponding content
+                tab.classList.add('active');
+                const tabId = tab.dataset.tab;
+                document.getElementById(tabId).classList.add('active');
+            });
+        });
+
+        // ============================================
+        // Groups Management
+        // ============================================
+        let allGroups = [];
+        let selectedGroup = null;
+
+        async function loadGroups() {
+            const listEl = document.getElementById('groupsList');
+            listEl.innerHTML = '<div class="empty-state"><span class="skeleton" style="width: 100%; height: 60px; display: block;"></span></div>';
+
+            try {
+                const response = await fetch('/api/groups');
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to load groups');
+                }
+
+                allGroups = await response.json();
+                renderGroups(allGroups);
+                showToast(`Loaded ${allGroups.length} groups`, 'success');
+            } catch (e) {
+                listEl.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-exclamation-triangle empty-state-icon"></i>
+                            <p class="empty-state-text">${e.message}</p>
+                        </div>
+                    `;
+                showToast(e.message, 'error');
+            }
+        }
+
+        function renderGroups(groups) {
+            const listEl = document.getElementById('groupsList');
+
+            if (groups.length === 0) {
+                listEl.innerHTML = `
+                        <div class="empty-state">
+                            <i class="bi bi-people empty-state-icon"></i>
+                            <p class="empty-state-text">No groups found</p>
+                        </div>
+                    `;
+                return;
+            }
+
+            listEl.innerHTML = groups.map(group => `
+                    <div class="group-item ${selectedGroup?.id === group.id ? 'selected' : ''}" data-id="${group.id}" onclick="selectGroup('${group.id}')">
+                        <div class="group-avatar">
+                            <i class="bi bi-people-fill"></i>
+                        </div>
+                        <div class="group-details">
+                            <div class="group-name">${escapeHtml(group.name)}</div>
+                            <div class="group-meta">${group.participants} members</div>
+                        </div>
+                    </div>
+                `).join('');
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        async function selectGroup(groupId) {
+            const group = allGroups.find(g => g.id === groupId);
+            if (!group) return;
+
+            selectedGroup = group;
+            document.getElementById('selectedGroupId').value = group.id;
+            document.getElementById('selectedGroupName').value = group.name;
+
+            // Update visual selection
+            document.querySelectorAll('.group-item').forEach(el => {
+                el.classList.toggle('selected', el.dataset.id === groupId);
+            });
+
+            // Show group info
+            document.getElementById('groupInfo').style.display = 'block';
+            document.getElementById('groupMemberCount').textContent = `${group.participants} members`;
+
+            // Format creation date
+            if (group.creation) {
+                const date = new Date(group.creation * 1000);
+                document.getElementById('groupCreatedAt').textContent = date.toLocaleDateString();
+            } else {
+                document.getElementById('groupCreatedAt').textContent = '--';
+            }
+
+            document.getElementById('groupCreator').textContent = group.owner ? group.owner.split('@')[0] : '--';
+        }
+
+        // Group search/filter
+        document.getElementById('groupSearch').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            if (!query) {
+                renderGroups(allGroups);
+                return;
+            }
+
+            const filtered = allGroups.filter(g =>
+                g.name.toLowerCase().includes(query)
+            );
+            renderGroups(filtered);
+        });
+
+        // Refresh groups button
+        document.getElementById('refreshGroupsBtn').addEventListener('click', loadGroups);
+
+        // Send to group
+        document.getElementById('sendToGroupBtn').addEventListener('click', async () => {
+            const groupId = document.getElementById('selectedGroupId').value;
+            const message = document.getElementById('groupMessage').value;
+            const sendAt = document.getElementById('groupSendAt').value;
+            const mediaFile = document.getElementById('groupMediaFile').files[0];
+
+            if (!groupId) {
+                return showToast('Please select a group first', 'warning');
+            }
+
+            if (!message && !mediaFile) {
+                return showToast('Please enter a message or select media', 'warning');
+            }
+
+            const formData = new FormData();
+            formData.append('message', message);
+            if (sendAt) formData.append('sendAt', sendAt);
+            if (mediaFile) formData.append('media', mediaFile);
+
+            const btn = document.getElementById('sendToGroupBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Sending...';
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(groupId)}/send`, {
+                    method: 'POST',
+                    body: formData
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    document.getElementById('groupMessage').value = '';
+                    document.getElementById('groupMediaFile').value = '';
+                    document.getElementById('groupSendAt').value = '';
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to send message', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-send"></i> Send to Group';
+        });
+
+        // ============================================
+        // Group Management Functions
+        // ============================================
+        let selectedMembersForNewGroup = [];
+
+        // Load group members when selecting a group
+        async function loadGroupMembers(groupId) {
+            const listEl = document.getElementById('groupMembersList');
+            listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><span class="skeleton" style="width: 100%; height: 40px; display: block;"></span></div>';
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(groupId)}/participants`);
+                const members = await response.json();
+
+                if (members.length > 0) {
+                    listEl.innerHTML = members.map(m => `
+                        <div class="list-item member-item" data-id="${m.id}">
+                            <div class="list-item-content">
+                                <span class="list-item-title">${m.isLid ? `<i class="bi bi-person" style="opacity:0.5"></i> ` : ''}${m.displayName || m.phone}</span>
+                                <span class="list-item-subtitle">${m.isAdmin ? (m.admin === 'superadmin' ? '👑 Owner' : '⭐ Admin') : 'Member'}${m.isLid ? ' • Linked Contact' : ''}</span>
+                            </div>
+                            ${!m.isAdmin ? `<button class="btn btn-outline btn-sm btn-icon btn-danger-hover" onclick="removeMember('${m.id}')" title="Remove">
+                                <i class="bi bi-person-dash"></i>
+                            </button>` : ''}
+                        </div>
+                    `).join('');
+                } else {
+                    listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">No members found</p></div>';
+                }
+            } catch (e) {
+                listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">Failed to load members</p></div>';
+            }
+        }
+
+        // Enhanced selectGroup to also load members
+        const originalSelectGroup = selectGroup;
+        selectGroup = async function (groupId) {
+            await originalSelectGroup(groupId);
+            document.getElementById('groupMembersSection').style.display = 'block';
+            await loadGroupMembers(groupId);
+        };
+
+        // Remove member from group
+        async function removeMember(memberId) {
+            if (!selectedGroup) return;
+            if (!confirm('Remove this member from the group?')) return;
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(selectedGroup.id)}/participants/remove`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participants: [memberId] })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Member removed', 'success');
+                    await loadGroupMembers(selectedGroup.id);
+                    await loadGroups(); // Refresh group list
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to remove member', 'error');
+            }
+        }
+
+        // Add Member Modal
+        function openAddMemberModal() {
+            if (!selectedGroup) {
+                return showToast('Please select a group first', 'warning');
+            }
+            document.getElementById('addMemberModal').classList.add('active');
+            populateAddMemberList();
+        }
+
+        function closeAddMemberModal() {
+            document.getElementById('addMemberModal').classList.remove('active');
+        }
+
+        function populateAddMemberList() {
+            const listEl = document.getElementById('addMemberContactList');
+            if (allContacts.length === 0) {
+                listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">No contacts available</p></div>';
+                return;
+            }
+
+            listEl.innerHTML = allContacts.map(c => `
+                <label class="checkbox-item">
+                    <input type="checkbox" value="${c.phone}" name="addMemberCheckbox">
+                    <span>${c.name} (${c.phone})</span>
+                </label>
+            `).join('');
+        }
+
+        document.getElementById('addMemberBtn').addEventListener('click', openAddMemberModal);
+
+        document.getElementById('addMemberSearchInput').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const items = document.querySelectorAll('#addMemberContactList .checkbox-item');
+            items.forEach(item => {
+                const text = item.textContent.toLowerCase();
+                item.style.display = text.includes(query) ? '' : 'none';
+            });
+        });
+
+        document.getElementById('confirmAddMemberBtn').addEventListener('click', async () => {
+            if (!selectedGroup) return;
+
+            const checkboxes = document.querySelectorAll('input[name="addMemberCheckbox"]:checked');
+            const phones = Array.from(checkboxes).map(cb => cb.value);
+
+            if (phones.length === 0) {
+                return showToast('Please select at least one contact', 'warning');
+            }
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(selectedGroup.id)}/participants/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participants: phones })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    closeAddMemberModal();
+                    await loadGroupMembers(selectedGroup.id);
+                    await loadGroups();
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to add members', 'error');
+            }
+        });
+
+        // ============================================
+        // VCF Import Modal
+        // ============================================
+        let parsedVcfPhones = [];
+
+        document.getElementById('importVcfMembersBtn').addEventListener('click', () => {
+            if (!selectedGroup) {
+                return showToast('Please select a group first', 'warning');
+            }
+            document.getElementById('vcfImportModal').classList.add('active');
+            document.getElementById('vcfMemberFile').value = '';
+            document.getElementById('vcfMemberPreview').style.display = 'none';
+            document.getElementById('confirmVcfImportBtn').disabled = true;
+            parsedVcfPhones = [];
+        });
+
+        function closeVcfImportModal() {
+            document.getElementById('vcfImportModal').classList.remove('active');
+        }
+
+        document.getElementById('vcfMemberFile').addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const text = await file.text();
+            const phones = parseVcfForPhones(text);
+            parsedVcfPhones = phones;
+
+            const previewEl = document.getElementById('vcfMemberPreview');
+            const listEl = document.getElementById('vcfMemberList');
+            const countEl = document.getElementById('vcfMemberCount');
+            const confirmBtn = document.getElementById('confirmVcfImportBtn');
+
+            if (phones.length > 0) {
+                countEl.textContent = phones.length;
+                listEl.innerHTML = phones.map(p => `
+                    <div class="list-item" style="padding: 8px 12px;">
+                        <span>${p}</span>
+                    </div>
+                `).join('');
+                previewEl.style.display = 'block';
+                confirmBtn.disabled = false;
+            } else {
+                previewEl.style.display = 'none';
+                confirmBtn.disabled = true;
+                showToast('No phone numbers found in VCF', 'warning');
+            }
+        });
+
+        function parseVcfForPhones(vcfText) {
+            const phones = [];
+            const lines = vcfText.split(/\r\n|\r|\n/);
+            for (const line of lines) {
+                if (line.toUpperCase().startsWith('TEL')) {
+                    // Extract phone number from TEL line
+                    const match = line.match(/:([\d\s+\-().]+)/);
+                    if (match) {
+                        const phone = match[1].replace(/[\s\-().]/g, '').replace(/^\+/, '');
+                        if (phone.length >= 10) {
+                            phones.push(phone);
+                        }
+                    }
+                }
+            }
+            return [...new Set(phones)]; // Remove duplicates
+        }
+
+        document.getElementById('confirmVcfImportBtn').addEventListener('click', async () => {
+            if (!selectedGroup || parsedVcfPhones.length === 0) return;
+
+            const btn = document.getElementById('confirmVcfImportBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Importing...';
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(selectedGroup.id)}/participants/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participants: parsedVcfPhones })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    closeVcfImportModal();
+                    await loadGroupMembers(selectedGroup.id);
+                    await loadGroups();
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to import members', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'Import Members';
+        });
+
+        // ============================================
+        // Bulk Add Phone Numbers Modal
+        // ============================================
+        document.getElementById('bulkAddMembersBtn').addEventListener('click', () => {
+            if (!selectedGroup) {
+                return showToast('Please select a group first', 'warning');
+            }
+            document.getElementById('bulkAddModal').classList.add('active');
+            document.getElementById('bulkPhoneNumbers').value = '';
+        });
+
+        function closeBulkAddModal() {
+            document.getElementById('bulkAddModal').classList.remove('active');
+        }
+
+        document.getElementById('confirmBulkAddBtn').addEventListener('click', async () => {
+            if (!selectedGroup) return;
+
+            const text = document.getElementById('bulkPhoneNumbers').value.trim();
+            if (!text) {
+                return showToast('Please enter at least one phone number', 'warning');
+            }
+
+            // Parse phone numbers (one per line)
+            const phones = text.split(/\n/)
+                .map(line => line.trim().replace(/[\s\-().+]/g, ''))
+                .filter(phone => phone.length >= 10);
+
+            if (phones.length === 0) {
+                return showToast('No valid phone numbers found', 'warning');
+            }
+
+            const btn = document.getElementById('confirmBulkAddBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Adding...';
+
+            try {
+                const response = await fetch(`/api/groups/${encodeURIComponent(selectedGroup.id)}/participants/add`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ participants: phones })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(result.message, 'success');
+                    closeBulkAddModal();
+                    await loadGroupMembers(selectedGroup.id);
+                    await loadGroups();
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to add members', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = 'Add Members';
+        });
+
+        // Create New Group
+        document.getElementById('newGroupMembersSearch').addEventListener('input', (e) => {
+            const query = e.target.value.toLowerCase().trim();
+            const listEl = document.getElementById('newGroupMembersList');
+
+            if (!query) {
+                listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">Type to search contacts</p></div>';
+                return;
+            }
+
+            const filtered = allContacts.filter(c =>
+                c.name.toLowerCase().includes(query) || c.phone.includes(query)
+            );
+
+            if (filtered.length === 0) {
+                listEl.innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">No contacts found</p></div>';
+                return;
+            }
+
+            listEl.innerHTML = filtered.map(c => `
+                <label class="checkbox-item">
+                    <input type="checkbox" value="${c.phone}" name="newGroupMemberCheckbox" 
+                        ${selectedMembersForNewGroup.includes(c.phone) ? 'checked' : ''}
+                        onchange="toggleNewGroupMember('${c.phone}', '${c.name.replace(/'/g, "\\'")}')">
+                    <span>${c.name} (${c.phone})</span>
+                </label>
+            `).join('');
+        });
+
+        function toggleNewGroupMember(phone, name) {
+            const idx = selectedMembersForNewGroup.findIndex(m => m.phone === phone);
+            if (idx >= 0) {
+                selectedMembersForNewGroup.splice(idx, 1);
+            } else {
+                selectedMembersForNewGroup.push({ phone, name });
+            }
+            renderSelectedNewGroupMembers();
+        }
+
+        function renderSelectedNewGroupMembers() {
+            const container = document.getElementById('selectedNewGroupMembers');
+            container.innerHTML = selectedMembersForNewGroup.map(m => `
+                <span class="badge badge-primary" style="padding: 6px 12px; cursor: pointer;" onclick="toggleNewGroupMember('${m.phone}', '${m.name.replace(/'/g, "\\'")}')">
+                    ${m.name} <i class="bi bi-x"></i>
+                </span>
+            `).join('');
+        }
+
+        document.getElementById('createGroupBtn').addEventListener('click', async () => {
+            const name = document.getElementById('newGroupName').value.trim();
+
+            if (!name) {
+                return showToast('Please enter a group name', 'warning');
+            }
+
+            const participants = selectedMembersForNewGroup.map(m => m.phone);
+
+            const btn = document.getElementById('createGroupBtn');
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner"></span> Creating...';
+
+            try {
+                const response = await fetch('/api/groups/create', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, participants })
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast(`Group "${name}" created!`, 'success');
+                    document.getElementById('newGroupName').value = '';
+                    document.getElementById('newGroupMembersSearch').value = '';
+                    document.getElementById('newGroupMembersList').innerHTML = '<div class="empty-state" style="padding: 16px;"><p class="empty-state-text">Type to search contacts</p></div>';
+                    selectedMembersForNewGroup = [];
+                    renderSelectedNewGroupMembers();
+                    await loadGroups();
+                } else {
+                    showToast(`Error: ${result.error}`, 'error');
+                }
+            } catch (e) {
+                showToast('Failed to create group', 'error');
+            }
+
+            btn.disabled = false;
+            btn.innerHTML = '<i class="bi bi-plus-lg"></i> Create Group';
+        });
+
+        // ============================================
+        // Initialize
+        // ============================================
+        document.addEventListener('DOMContentLoaded', () => {
+            loadContacts();
+            loadBirthdays();
+            loadQueue();
+            loadSettings();
+            refreshStats();
+
+            // Refresh stats every 30 seconds
+            setInterval(refreshStats, 30000);
+        });
+    </script>
+</body>
+
+</html>

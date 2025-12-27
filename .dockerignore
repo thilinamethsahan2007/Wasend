@@ -1,0 +1,14 @@
+# Ignore node_modules, as they will be installed inside the container
+node_modules
+
+# Ignore local data and session files
+data
+*.log
+
+# Ignore environment files and git history
+.env
+.git
+.gitignore
+.dockerignore
+Dockerfile
+README.md

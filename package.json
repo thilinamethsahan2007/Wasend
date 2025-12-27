@@ -1,0 +1,42 @@
+{
+  "name": "wasender-personal-bot",
+  "version": "2.0.0",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "dev": "npx nodemon src/server.js",
+    "start": "node src/server.js",
+    "start:prod": "NODE_ENV=production node src/server.js"
+  },
+  "dependencies": {
+    "@google/genai": "^1.21.0",
+    "@google/generative-ai": "^0.21.0",
+    "@supabase/supabase-js": "^2.89.0",
+    "@whiskeysockets/baileys": "^7.0.0-rc.4",
+    "axios": "^1.12.2",
+    "bcrypt": "^6.0.0",
+    "compression": "^1.7.4",
+    "dayjs": "^1.11.18",
+    "dotenv": "^17.2.3",
+    "express": "^4.21.2",
+    "google-spreadsheet": "^5.0.2",
+    "helmet": "^8.0.0",
+    "jsonwebtoken": "^9.0.3",
+    "link-preview-js": "^3.2.0",
+    "mime-types": "^3.0.1",
+    "multer": "^2.0.2",
+    "nanoid": "^5.1.6",
+    "node-fetch": "^3.3.2",
+    "pino": "^9.12.0",
+    "pino-pretty": "^13.1.1",
+    "qrcode": "^1.5.4",
+    "socket.io": "^4.8.1",
+    "vcard-parser": "^1.0.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.10"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
