@@ -367,6 +367,77 @@ async function getFinancesSince(startDate) {
 }
 
 // ============================================
+// Settings
+// ============================================
+
+async function getSettings() {
+    if (!supabase) return {};
+    const { data, error } = await supabase
+        .from('settings')
+        .select('*');
+    if (error) {
+        console.error('Failed to get settings:', error.message);
+        return {};
+    }
+    // Convert array to object { key: value }
+    const settings = {};
+    (data || []).forEach(item => {
+        settings[item.key] = item.value;
+    });
+    return settings;
+}
+
+async function getSetting(key, defaultValue = null) {
+    if (!supabase) return defaultValue;
+    const { data, error } = await supabase
+        .from('settings')
+        .select('value')
+        .eq('key', key)
+        .single();
+    if (error) {
+        if (error.code !== 'PGRST116') { // Not found is ok
+            console.error('Failed to get setting:', error.message);
+        }
+        return defaultValue;
+    }
+    return data?.value ?? defaultValue;
+}
+
+async function updateSetting(key, value) {
+    if (!supabase) return false;
+    const { error } = await supabase
+        .from('settings')
+        .upsert({
+            key,
+            value: String(value),
+            updated_at: new Date().toISOString()
+        }, { onConflict: 'key' });
+    if (error) {
+        console.error('Failed to update setting:', error.message);
+        return false;
+    }
+    return true;
+}
+
+async function updateSettings(settingsObj) {
+    if (!supabase) return false;
+    const rows = Object.entries(settingsObj).map(([key, value]) => ({
+        key,
+        value: String(value),
+        updated_at: new Date().toISOString()
+    }));
+
+    const { error } = await supabase
+        .from('settings')
+        .upsert(rows, { onConflict: 'key' });
+    if (error) {
+        console.error('Failed to update settings:', error.message);
+        return false;
+    }
+    return true;
+}
+
+// ============================================
 // Exports
 // ============================================
 
@@ -396,4 +467,9 @@ export {
     // Finances
     addFinanceEntry,
     getFinancesSince,
+    // Settings
+    getSettings,
+    getSetting,
+    updateSetting,
+    updateSettings,
 };

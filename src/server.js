@@ -20,7 +20,7 @@ dayjs.tz.setDefault("Asia/Colombo");
 
 import logger from './services/logger.js';
 import * as db from './services/database.js';
-import { initBaileys, getSocket, getConnectionStatus, isConnectingStatus, getUptime, startBaileys, updateSettings } from './services/baileys.js';
+import { initBaileys, getSocket, getConnectionStatus, isConnectingStatus, getUptime, startBaileys, updateSettings, loadSettingsFromDb } from './services/baileys.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,38 +99,66 @@ app.post("/api/bot/disconnect", async (req, res) => {
 	res.json({ success: true, message: "Disconnected" });
 });
 
-app.get("/api/settings", (req, res) => {
-	res.json({
-		autoViewStatus: process.env.AUTO_VIEW_STATUS !== "false",
-		autoReactStatus: process.env.AUTO_REACT_STATUS === "true",
-		reactionEmoji: process.env.REACTION_EMOJI || "❤️,💕,😍,👍",
-		lastSeenUpdatedAt: getUptime()
-	});
+// Settings - now stored in database
+app.get("/api/settings", async (req, res) => {
+	try {
+		const settings = await db.getSettings();
+		res.json({
+			autoViewStatus: settings.auto_view_status === 'true',
+			autoReactStatus: settings.auto_react_status === 'true',
+			reactionEmoji: settings.reaction_emoji || "❤️,💕,😍,👍",
+			freezeLastSeen: settings.freeze_last_seen === 'true',
+		});
+	} catch (error) {
+		logger.error({ err: error }, 'Failed to get settings');
+		// Fallback to env variables
+		res.json({
+			autoViewStatus: process.env.AUTO_VIEW_STATUS !== "false",
+			autoReactStatus: process.env.AUTO_REACT_STATUS === "true",
+			reactionEmoji: process.env.REACTION_EMOJI || "❤️,💕,😍,👍",
+			freezeLastSeen: true,
+		});
+	}
 });
 
-app.post("/api/settings", (req, res) => {
-	const { autoViewStatus, autoReactStatus, reactionEmoji } = req.body;
+app.post("/api/settings", async (req, res) => {
+	try {
+		const { autoViewStatus, autoReactStatus, reactionEmoji, freezeLastSeen } = req.body;
 
-	if (typeof autoViewStatus !== 'undefined') {
-		process.env.AUTO_VIEW_STATUS = String(autoViewStatus);
+		const updates = {};
+		if (typeof autoViewStatus !== 'undefined') {
+			updates.auto_view_status = String(autoViewStatus);
+		}
+		if (typeof autoReactStatus !== 'undefined') {
+			updates.auto_react_status = String(autoReactStatus);
+		}
+		if (typeof reactionEmoji !== 'undefined') {
+			updates.reaction_emoji = reactionEmoji;
+		}
+		if (typeof freezeLastSeen !== 'undefined') {
+			updates.freeze_last_seen = String(freezeLastSeen);
+		}
+
+		// Save to database
+		await db.updateSettings(updates);
+
+		// Update in-memory settings in baileys
+		const newSettings = {
+			autoViewStatus: updates.auto_view_status === 'true',
+			autoReactStatus: updates.auto_react_status === 'true',
+			reactionEmoji: updates.reaction_emoji,
+			freezeLastSeen: updates.freeze_last_seen === 'true',
+		};
+		updateSettings(newSettings);
+
+		io.emit("settings:update", newSettings);
+		logger.info('Settings updated:', newSettings);
+
+		res.json({ success: true, message: "Settings saved to database" });
+	} catch (error) {
+		logger.error({ err: error }, 'Failed to update settings');
+		res.status(500).json({ success: false, error: 'Failed to save settings' });
 	}
-	if (typeof autoReactStatus !== 'undefined') {
-		process.env.AUTO_REACT_STATUS = String(autoReactStatus);
-	}
-	if (typeof reactionEmoji !== 'undefined') {
-		process.env.REACTION_EMOJI = reactionEmoji;
-	}
-
-	const newSettings = {
-		autoViewStatus: process.env.AUTO_VIEW_STATUS !== "false",
-		autoReactStatus: process.env.AUTO_REACT_STATUS === "true",
-		reactionEmoji: process.env.REACTION_EMOJI
-	};
-
-	updateSettings(newSettings);
-	io.emit("settings:update", newSettings);
-
-	res.json({ success: true, message: "Settings updated" });
 });
 
 app.post("/api/schedule", upload.single("media"), async (req, res) => {
@@ -701,8 +729,11 @@ io.on("connection", (socket) => {
 	});
 });
 
-// Initialize Baileys connection
-initBaileys(io);
+// Load settings from database first, then initialize Baileys
+(async () => {
+	await loadSettingsFromDb();
+	initBaileys(io);
+})();
 
 server.listen(PORT, () => {
 	logger.info(`Server running on http://localhost:${PORT}`);

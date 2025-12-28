@@ -51,7 +51,28 @@ export function updateSettings(newSettings) {
 	if (typeof newSettings.reactionEmoji !== 'undefined') {
 		reactionEmoji = newSettings.reactionEmoji;
 	}
-	logger.info('Bot settings updated:', { autoViewStatus, autoReactStatus, reactionEmoji });
+	if (typeof newSettings.freezeLastSeen !== 'undefined') {
+		freezeLastSeen = newSettings.freezeLastSeen;
+	}
+	logger.info('Bot settings updated:', { autoViewStatus, autoReactStatus, reactionEmoji, freezeLastSeen });
+}
+
+// Load settings from database on startup
+export async function loadSettingsFromDb() {
+	try {
+		const settings = await db.getSettings();
+		if (Object.keys(settings).length > 0) {
+			autoViewStatus = settings.auto_view_status === 'true';
+			autoReactStatus = settings.auto_react_status === 'true';
+			reactionEmoji = settings.reaction_emoji || reactionEmoji;
+			freezeLastSeen = settings.freeze_last_seen !== 'false';
+			logger.info('Loaded settings from database:', { autoViewStatus, autoReactStatus, reactionEmoji, freezeLastSeen });
+		} else {
+			logger.info('No settings in database, using defaults from .env');
+		}
+	} catch (error) {
+		logger.warn('Failed to load settings from database, using defaults:', error.message);
+	}
 }
 
 function initializeGemini() {

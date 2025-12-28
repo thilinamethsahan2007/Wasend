@@ -76,6 +76,23 @@ CREATE INDEX IF NOT EXISTS idx_finances_type ON finances(type);
 CREATE INDEX IF NOT EXISTS idx_finances_category ON finances(category);
 
 -- ============================================
+-- Settings Table
+-- ============================================
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL,
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Insert default settings
+INSERT INTO settings (key, value) VALUES
+  ('auto_view_status', 'true'),
+  ('auto_react_status', 'true'),
+  ('reaction_emoji', '🩵,🧡,💙,💚,💛,❤️'),
+  ('freeze_last_seen', 'true')
+ON CONFLICT (key) DO NOTHING;
+
+-- ============================================
 -- Row Level Security (RLS)
 -- ============================================
 
@@ -83,9 +100,11 @@ ALTER TABLE contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE birthdays ENABLE ROW LEVEL SECURITY;
 ALTER TABLE schedule ENABLE ROW LEVEL SECURITY;
 ALTER TABLE finances ENABLE ROW LEVEL SECURITY;
+ALTER TABLE settings ENABLE ROW LEVEL SECURITY;
 
 -- Allow all operations with anon key (for development)
 CREATE POLICY "Allow all for contacts" ON contacts FOR ALL USING (true);
 CREATE POLICY "Allow all for birthdays" ON birthdays FOR ALL USING (true);
 CREATE POLICY "Allow all for schedule" ON schedule FOR ALL USING (true);
 CREATE POLICY "Allow all for finances" ON finances FOR ALL USING (true);
+CREATE POLICY "Allow all for settings" ON settings FOR ALL USING (true);
