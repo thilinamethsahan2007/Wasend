@@ -39,6 +39,9 @@
             <button class="nav-tab" data-tab="groups">
                 <i class="bi bi-people-fill"></i> Groups
             </button>
+            <button class="nav-tab" data-tab="settings">
+                <i class="bi bi-gear-fill"></i> Settings
+            </button>
         </nav>
 
         <!-- Dashboard Tab -->
@@ -449,6 +452,79 @@
                 <div id="selectedNewGroupMembers" style="display: flex; flex-wrap: wrap; gap: 8px;">
                     <!-- Selected members will appear here as badges -->
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Tab -->
+    <div id="settings" class="tab-content">
+        <div class="grid grid-2">
+            <!-- Bot Settings Card -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <h3 class="card-title">Bot Settings</h3>
+                </div>
+
+                <div class="settings-list">
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <span class="setting-label">Auto View Status</span>
+                            <span class="setting-description">Automatically view WhatsApp statuses</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoViewStatus">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <span class="setting-label">Auto React to Status</span>
+                            <span class="setting-description">Send emoji reaction when viewing status</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="autoReactStatus">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+
+                    <div class="setting-item">
+                        <div class="setting-info">
+                            <span class="setting-label">Freeze Last Seen</span>
+                            <span class="setting-description">Keep your last seen hidden</span>
+                        </div>
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="freezeLastSeen">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Reaction Emoji Card -->
+            <div class="card slide-up">
+                <div class="card-header">
+                    <div class="card-icon" style="background: linear-gradient(135deg, #ff006e, #cc0058);">
+                        <i class="bi bi-emoji-smile"></i>
+                    </div>
+                    <h3 class="card-title">Reaction Emojis</h3>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Emojis for Status Reactions</label>
+                    <input type="text" id="reactionEmoji" class="form-control" placeholder="🩵,🧡,💙,💚,💛,❤️">
+                    <p style="font-size: 0.85rem; opacity: 0.7; margin-top: 8px;">
+                        <i class="bi bi-info-circle"></i> Separate multiple emojis with commas. A random one will be
+                        used.
+                    </p>
+                </div>
+
+                <button class="btn btn-primary" id="saveSettingsBtn" style="margin-top: 16px;">
+                    <i class="bi bi-check-lg"></i> Save Settings
+                </button>
             </div>
         </div>
     </div>
@@ -1708,6 +1784,63 @@
 
             btn.disabled = false;
             btn.innerHTML = '<i class="bi bi-plus-lg"></i> Create Group';
+        });
+
+        // ============================================
+        // Settings Functions
+        // ============================================
+        async function loadSettings() {
+            try {
+                const response = await fetch('/api/settings');
+                const settings = await response.json();
+
+                document.getElementById('autoViewStatus').checked = settings.autoViewStatus;
+                document.getElementById('autoReactStatus').checked = settings.autoReactStatus;
+                document.getElementById('freezeLastSeen').checked = settings.freezeLastSeen;
+                document.getElementById('reactionEmoji').value = settings.reactionEmoji || '';
+            } catch (error) {
+                console.error('Failed to load settings:', error);
+            }
+        }
+
+        async function saveSettings() {
+            const settings = {
+                autoViewStatus: document.getElementById('autoViewStatus').checked,
+                autoReactStatus: document.getElementById('autoReactStatus').checked,
+                freezeLastSeen: document.getElementById('freezeLastSeen').checked,
+                reactionEmoji: document.getElementById('reactionEmoji').value.trim()
+            };
+
+            try {
+                const response = await fetch('/api/settings', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(settings)
+                });
+                const result = await response.json();
+
+                if (result.success) {
+                    showToast('Settings saved!', 'success');
+                } else {
+                    showToast('Failed to save settings', 'error');
+                }
+            } catch (error) {
+                console.error('Failed to save settings:', error);
+                showToast('Failed to save settings', 'error');
+            }
+        }
+
+        // Save settings button handler
+        document.getElementById('saveSettingsBtn')?.addEventListener('click', saveSettings);
+
+        // Listen for settings updates from server
+        socket.on('settings:update', (settings) => {
+            document.getElementById('autoViewStatus').checked = settings.autoViewStatus;
+            document.getElementById('autoReactStatus').checked = settings.autoReactStatus;
+            document.getElementById('freezeLastSeen').checked = settings.freezeLastSeen;
+            if (settings.reactionEmoji) {
+                document.getElementById('reactionEmoji').value = settings.reactionEmoji;
+            }
         });
 
         // ============================================
