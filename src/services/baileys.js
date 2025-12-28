@@ -268,6 +268,9 @@ export async function startBaileys(io, clearAuth = false) {
 			}
 
 			if (from !== "status@broadcast") return;
+
+			logger.debug(`Status received from ${msg.key?.participant}, autoViewStatus=${autoViewStatus}`);
+
 			const statuses = await readJson(statusCacheFile, []);
 			const item = {
 				id: msg.key?.id || nanoid(),
@@ -283,35 +286,69 @@ export async function startBaileys(io, clearAuth = false) {
 			io.emit("statuses:update", item);
 
 			if (autoViewStatus && msg.key?.id && msg.key?.participant) {
-				try {
-					if (typeof sock.readMessages === "function") {
-						await sock.readMessages([msg.key]);
-					}
-				} catch { }
-				try {
-				} catch { }
-
 				const statusId = msg.key.id;
 				const author = msg.key.participant;
 				let viewed = false;
 				let error = null;
+
+				logger.info(`Attempting to auto-view status from ${author}`);
+
 				try {
+					// Subscribe to the user's status first
 					if (typeof sock.statusSubscribe === "function" && author) {
-						await sock.statusSubscribe(author);
+						try {
+							await sock.statusSubscribe(author);
+							logger.debug(`Subscribed to status from ${author}`);
+						} catch (subErr) {
+							logger.debug(`Status subscribe failed (non-critical): ${subErr.message}`);
+						}
 					}
-					await new Promise(r => setTimeout(r, 1200));
+
+					// Small delay to ensure subscription is processed
+					await new Promise(r => setTimeout(r, 500));
+
 					const normAuthor = author ? jidNormalizedUser(author) : author;
+
+					// Try different methods to mark as read
 					if (typeof sock.readMessages === "function") {
-						await sock.readMessages([{ chat: "status@broadcast", id: statusId, participant: normAuthor }]);
-						viewed = true;
-					} else if (typeof sock.sendReadReceipt === "function") {
-						await sock.sendReadReceipt("status@broadcast", normAuthor, [statusId]);
-						viewed = true;
+						try {
+							await sock.readMessages([{
+								remoteJid: "status@broadcast",
+								id: statusId,
+								participant: normAuthor
+							}]);
+							viewed = true;
+							logger.info(`Status viewed using readMessages for ${author}`);
+						} catch (readErr) {
+							logger.debug(`readMessages failed: ${readErr.message}`);
+						}
 					}
+
+					if (!viewed && typeof sock.sendReadReceipt === "function") {
+						try {
+							await sock.sendReadReceipt("status@broadcast", normAuthor, [statusId]);
+							viewed = true;
+							logger.info(`Status viewed using sendReadReceipt for ${author}`);
+						} catch (receiptErr) {
+							logger.debug(`sendReadReceipt failed: ${receiptErr.message}`);
+						}
+					}
+
 					if (!viewed && typeof sock.sendReceipt === "function") {
-						await sock.sendReceipt("status@broadcast", normAuthor, [statusId], "read");
-						viewed = true;
+						try {
+							await sock.sendReceipt("status@broadcast", normAuthor, [statusId], "read");
+							viewed = true;
+							logger.info(`Status viewed using sendReceipt for ${author}`);
+						} catch (receiptErr) {
+							logger.debug(`sendReceipt failed: ${receiptErr.message}`);
+						}
 					}
+
+					if (!viewed) {
+						logger.warn(`Could not view status from ${author} - no working method found`);
+					}
+
+					// Auto-react if enabled and status was viewed
 					if (viewed && autoReactStatus && reactionEmoji) {
 						try {
 							let selectedEmoji = reactionEmoji;
@@ -337,15 +374,18 @@ export async function startBaileys(io, clearAuth = false) {
 					error = viewErr?.message || String(viewErr);
 					logger.warn({ err: viewErr }, "Failed to auto-view status");
 				}
+
+				// Freeze last seen after viewing
 				try {
 					if (freezeLastSeen && typeof sock.sendPresenceUpdate === "function") {
 						await sock.sendPresenceUpdate("available");
-						await new Promise(r => setTimeout(r, 800));
+						await new Promise(r => setTimeout(r, 300));
 						await sock.sendPresenceUpdate("unavailable");
 						lastSeenUpdatedAt = new Date().toISOString();
 						io.emit("presence:lastSeen", { lastSeenUpdatedAt });
 					}
 				} catch { }
+
 				io.emit("statuses:viewed", { id: statusId, author, viewed, error });
 			}
 		} catch (e) {
