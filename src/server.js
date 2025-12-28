@@ -79,6 +79,19 @@ app.get("/api/status", (req, res) => {
 	});
 });
 
+// Debug endpoint to check settings state
+app.get("/api/debug/settings", async (req, res) => {
+	try {
+		const dbSettings = await db.getSettings();
+		res.json({
+			database: dbSettings,
+			note: "Check Railway logs for 'Status received from' and 'Attempting to auto-view' messages"
+		});
+	} catch (error) {
+		res.status(500).json({ error: error.message });
+	}
+});
+
 app.get("/api/uptime", (req, res) => {
 	res.json({
 		uptime: getUptime(),
